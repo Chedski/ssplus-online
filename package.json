@@ -1,0 +1,19 @@
+{
+  "name": "ssplus",
+  "version": "1.0.0",
+  "description": "Sound Space+ Online Services",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chedski/ssplus-online.git"
+  },
+  "author": "Chedski",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Chedski/ssplus-online/issues"
+  },
+  "homepage": "https://github.com/Chedski/ssplus-online#readme"
+}
