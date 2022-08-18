@@ -277,5 +277,33 @@ class SSPM {
         throw "Unknown .sspm version"
     }
   }
+  
+  /**
+   * Gets the cover image as a Buffer.
+   * @returns {Buffer}
+   */
+   getCover() {
+    if (this.path == "") { throw "No file loaded" }
+    if (this.cover_offset != undefined && this.cover_length != undefined) {
+      var file = fs.readFileSync(this.path, {encoding: null})
+      return file.slice(this.cover_offset, this.cover_offset + this.cover_length)
+    } else {
+      throw "File does not have a cover"
+    }
+  }
+
+  /**
+   * Gets the map's music as a Buffer.
+   * @returns {Buffer}
+   */
+  getAudio() {
+    if (this.path == "") { throw "No file loaded" }
+    if (this.music_offset != undefined && this.music_length != undefined) {
+      var file = fs.readFileSync(this.path, {encoding: null})
+      return file.slice(this.music_offset, this.music_offset + this.music_length)
+    } else {
+      throw "File does not have audio"
+    }
+  }
 }
 exports.SSPM = SSPM
