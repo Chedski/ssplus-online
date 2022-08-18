@@ -1,5 +1,6 @@
 // @ts-check
 const fs = require('fs');
+const crypto = require('crypto');
 const util = require('./util');
 
 /**
@@ -140,6 +141,12 @@ class SSPM {
    * @type {number}
    */
   note_data_length;
+
+  /**
+   * SHA256 hash of the note data binary block.
+   * @type {crypto.Hash} 
+   */
+  note_data_hash;
   
 
   /**
@@ -242,6 +249,9 @@ class SSPM {
     // Notes
     this.note_data_offset = o
     this.note_data_length = (file.byteLength - o)
+    
+    var note_data = file.slice(this.note_data_offset, this.note_data_offset + this.note_data_length)
+    this.note_data_hash = crypto.createHash('sha256').update(note_data);
   }
 
   /**
