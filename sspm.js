@@ -201,7 +201,6 @@ class SSPM {
     this.song = line.text
 
     line = util.readLine(file,o);  o = line.off
-    var authors = line.text
     this.author = line.text.split(/[,\s]*(?:&|and|\+)\s*|,\s*/g)
     
     this.length_ms = file.readInt32LE(o);  o += 4
