@@ -2,6 +2,8 @@
 const fs = require('fs');
 const crypto = require('crypto');
 const util = require('./util');
+const path = require('path');
+const config = require('./mapdb_config').config
 
 /**
  * SS-style category-based map difficulty.
@@ -20,6 +22,21 @@ const Difficulty = {
   TASUKETE: 4
 }
 exports.Difficulty = Difficulty
+
+/**
+ * SS-style category-based map difficulty.
+ * @readonly
+ * @type {Object<Difficulty,string>}
+ */
+const DifficultyName = {
+  [-1]: "N/A",
+  [0]: "Easy",
+  [1]: "Medium",
+  [2]: "Hard",
+  [3]: "LOGIC?",
+  [4]: "助 (Tasukete)",
+}
+exports.DifficultyName = DifficultyName
 
 /**
  * Signature for .sspm files
@@ -43,7 +60,7 @@ class SSPM {
 
   /**
    * Absolute path to the map file's location in the filesystem.
-   * @type {import('fs').PathOrFileDescriptor}
+   * @type {string}
    */
   path = "";
 
@@ -255,7 +272,7 @@ class SSPM {
 
   /**
    * Reads all available metadata from a .sspm file.
-   * @param {import('fs').PathOrFileDescriptor} path
+   * @param {string} path
    */
   load(path) {
     this.path = path
@@ -267,14 +284,18 @@ class SSPM {
     if (!sspmSignature.equals(sig)) { throw "Invalid file signature" }
 
     var version = file.readInt16LE(4)
-    console.log("SSPM file is version " + String(version))
     this.version = version
 
     switch (version) {
       case 1:
-        return this._v1(file)
+        this._v1(file)
+        break
       default:
         throw "Unknown .sspm version"
+    }
+
+    if (this.id.startsWith("ss_archive")) {
+      this.tags.unshift("ss_archive")
     }
   }
   
@@ -304,6 +325,51 @@ class SSPM {
     } else {
       throw "File does not have audio"
     }
+  }
+
+  /**
+   * Gets the .sspm as a Buffer.
+   * @returns {Buffer}
+   */
+  getBuffer() {
+    if (this.path == "") { throw "No file loaded" }
+    return fs.readFileSync(this.path, {encoding: null})
+  }
+
+
+  /** 
+   * Gets clean data, for use in web result JSON
+   * @returns {Object}
+   */
+  getClean() {
+    var data = {
+      id: this.id,
+      download: config.download_path_prefix + this.id,
+      audio: config.audio_path_prefix + this.id,
+      cover: this.has_cover ? (config.cover_path_prefix + this.id) : null,
+      version: this.version,
+      name: this.name,
+      song: this.song,
+      author: this.author,
+      difficulty: this.difficulty,
+      difficulty_name: DifficultyName[this.difficulty],
+      stars: this.stars,
+      length_ms: this.length_ms,
+      note_count: this.note_count,
+      has_cover: this.has_cover,
+      broken: this.broken,
+      tags: this.tags,
+      content_warnings: this.content_warnings,
+      note_data_offset: this.note_data_offset,
+      note_data_length: this.note_data_length,
+      cover_offset: this.cover_offset,
+      cover_length: this.cover_length,
+      music_format: this.music_format,
+      music_offset: this.music_offset,
+      music_length: this.music_length,
+    }
+
+    return data
   }
 }
 exports.SSPM = SSPM

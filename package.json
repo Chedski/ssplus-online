@@ -15,5 +15,10 @@
   "bugs": {
     "url": "https://github.com/Chedski/ssplus-online/issues"
   },
-  "homepage": "https://github.com/Chedski/ssplus-online#readme"
+  "homepage": "https://github.com/Chedski/ssplus-online#readme",
+  "dependencies": {
+    "express": "^4.18.1",
+    "express-rate-limit": "^6.5.1",
+    "js-yaml": "^4.1.0"
+  }
 }

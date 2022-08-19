@@ -1,0 +1,10 @@
+# SS+ Map Database Server Configuration
+
+map_folder: /path/to/folder # Folder containing the maps
+recursive: true # Search in subfolders
+recurse_hidden: false # Also search in hidden subfolders
+download_path_prefix: http://localhost:8079/ # MUST END WITH A SLASH
+audio_path_prefix: http://localhost:8079/audio/ # MUST END WITH A SLASH
+cover_path_prefix: http://localhost:8079/cover/ # MUST END WITH A SLASH
+port: 8079
+trust_proxy: 0
