@@ -92,7 +92,10 @@ app.use('/api/download/', (req,res) => {
     res.setHeader("Content-Disposition",`attachment; filename="${id}.sspm"`)  
     res.send(map.getBuffer())
   } else {
-    res.status(404).send(httpcat(404))
+    res.setHeader("Content-Type","application/json")
+    res.status(404).send(JSON.stringify(
+      { error:"022-310", info:"Map with requested ID does not exist" }
+    ))
   }
 })
 
@@ -105,7 +108,10 @@ app.use('/api/audio/', (req,res) => {
     res.setHeader("Content-Type","audio/" + map.music_format)
     res.send(map.getAudio())
   } else {
-    res.status(404).send(httpcat(404))
+    res.setHeader("Content-Type","application/json")
+    res.status(404).send(JSON.stringify(
+      { error:"022-310", info:"Map with requested ID does not exist" }
+    ))
   }
 })
 
@@ -118,11 +124,29 @@ app.use('/api/cover/', (req,res) => {
     res.setHeader("Content-Type","image/png")
     res.send(map.getCover())
   } else {
-    res.status(404).send(httpcat(404))
+    res.setHeader("Content-Type","application/json")
+    res.status(404).send(JSON.stringify(
+      { error:"022-310", info:"Map with requested ID does not exist" }
+    ))
   }
 })
 
 
+app.use('/api/map/', (req, res) => {
+  var id = req.url.replace(/^\//,"")
+  console.log("DATA: " + id)
+
+  if (maps.hasOwnProperty(id)) {
+    var map = maps[id]
+    res.setHeader("Content-Type","application/json")
+    res.send(JSON.stringify(map.getClean()))
+  } else {
+    res.setHeader("Content-Type","application/json")
+    res.status(404).send(JSON.stringify(
+      { error:"022-310", info:"Map with requested ID does not exist" }
+    ))
+  }
+})
 
 
 const limiter = rateLimit({
