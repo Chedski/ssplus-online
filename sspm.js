@@ -291,7 +291,8 @@ class SSPM {
         this._v1(file)
         break
       default:
-        throw "Unknown .sspm version"
+        console.log("Unknown .sspm version")
+        return
     }
 
     if (this.id.startsWith("ss_archive")) {
@@ -337,6 +338,60 @@ class SSPM {
   }
 
 
+  /**
+   * @returns {Array<Array<number>>}
+   */
+   _getNotes_v1() {
+    
+    var file = fs.readFileSync(this.path, {encoding: null})
+    var dv = file.slice(this.note_data_offset, this.note_data_offset + this.note_data_length)
+
+    var off = 0
+
+    var arr = []
+
+    while (off < dv.byteLength) {
+      var n = [dv.readUInt32LE(off)] ; off += 4
+      var st = dv.readUInt8(off) ; off += 1
+      if (st == 0) {
+        n.push(dv.readUInt8(off)) ; off += 1
+        n.push(dv.readUInt8(off)) ; off += 1
+      } else if (st == 1) {
+        n.push(dv.readFloatLE(off)) ; off += 4
+        n.push(dv.readFloatLE(off)) ; off += 4
+      } else {
+        return []
+      }
+      arr.push(n)
+    }
+    return arr
+  }
+
+  /**
+   * @returns {Array<Array<number>>}
+   */
+  getNotes() {
+    switch (this.version) {
+      case 1:
+        return this._getNotes_v1()
+      default:
+        throw "Unknown .sspm version"
+    }
+  }
+
+  /**
+   * @returns {string}
+   */
+  getTxt() {
+    var str = `${this.id}`
+    var notes = this.getNotes()
+    for (var n of notes) {
+      str += `,${n[1]}|${n[2]}|${n[0]}`
+    }
+    console.log(str)
+    return str
+  }
+
   /** 
    * Gets clean data, for use in web result JSON
    * @returns {Object}
@@ -345,6 +400,7 @@ class SSPM {
     var data = {
       id: this.id,
       download: config.download_path_prefix + this.id,
+      txt: config.txt_path_prefix + this.id,
       audio: config.audio_path_prefix + this.id,
       cover: this.has_cover ? (config.cover_path_prefix + this.id) : null,
       version: this.version,

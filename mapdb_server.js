@@ -148,6 +148,21 @@ app.use('/api/map/', (req, res) => {
   }
 })
 
+app.use('/api/txt/', (req, res) => {
+  var id = req.url.replace(/^\//,"")
+
+  if (maps.hasOwnProperty(id)) {
+    var map = maps[id]
+    res.setHeader("Content-Type","text/txt")
+    res.send(map.getTxt())
+  } else {
+    res.setHeader("Content-Type","text/txt")
+    res.status(404).send(JSON.stringify(
+      { error:"022-310", info:"Map with requested ID does not exist" }
+    ))
+  }
+})
+
 
 const limiter = rateLimit({
 	windowMs: 15 * 1000,
@@ -213,6 +228,7 @@ app.get('/api', (req, res) => {
   \` /ssp/mapdb/api/audio/<id> \` - Downloads a map's audio as mp3 or ogg
   \` /ssp/mapdb/api/cover/<id> \` - Downloads a map's cover image, if it has one
   \` /ssp/mapdb/api/download/<id> \` - Downloads the map
+  \` /ssp/mapdb/api/txt/<id> \` - Downloads the map as a .txt
 
   `)
 })
