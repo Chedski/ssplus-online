@@ -153,10 +153,10 @@ app.use('/api/txt/', (req, res) => {
 
   if (maps.hasOwnProperty(id)) {
     var map = maps[id]
-    res.setHeader("Content-Type","text/txt")
+    res.setHeader("Content-Type","text/plain")
     res.send(map.getTxt())
   } else {
-    res.setHeader("Content-Type","text/txt")
+    res.setHeader("Content-Type","text/plain")
     res.status(404).send(JSON.stringify(
       { error:"022-310", info:"Map with requested ID does not exist" }
     ))
@@ -208,10 +208,22 @@ app.get('/api/filter/difficulty', (req, res) => {
   }
 })
 
+var startup_time = Date.now()
+
 app.get('/api/all', (req, res) => {
-  console.log("/api/all")
+  if (req.headers['if-modified-since'] && Date.parse(req.headers['if-modified-since']) > startup_time) {
+    res.setHeader("Cache-Control", "max-age=3600")
+    if (req.headers['user-agent'] && req.headers['user-agent'].startsWith("GodotEngine")) {
+      res.status(304).send("mewo")
+    } else {
+      res.status(304).send(httpcat(304))
+    }
+    return
+  }
+  console.log("/api/all cache miss")
   var results = []
   res.setHeader("Content-Type","application/json")
+  res.setHeader("Cache-Control","max-age=3600")
   res.send(maps_json)
 })
 

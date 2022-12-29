@@ -38,6 +38,20 @@ const DifficultyName = {
 }
 exports.DifficultyName = DifficultyName
 
+const DT_UNKNOWN = 0x00
+const DT_INT_8 = 0x01
+const DT_INT_16 = 0x02
+const DT_INT_32 = 0x03
+const DT_INT_64 = 0x04
+const DT_FLOAT_32 = 0x05
+const DT_FLOAT_64 = 0x06
+const DT_POSITION = 0x07
+const DT_BUFFER = 0x08
+const DT_STRING = 0x09
+const DT_BUFFER_LONG = 0x0a
+const DT_STRING_LONG = 0x0b
+const DT_ARRAY = 0x0c
+
 /**
  * Signature for .sspm files
  * @readonly
@@ -96,13 +110,19 @@ class SSPM {
    * @type {Difficulty}
    */
   difficulty = -1;
+  
+  /**
+   * Difficulty name, as a string.  
+   * @type {string}
+   */
+  difficulty_name = "N/A";
 
   /**
    * Specific integer difficulty rating of a song, with -1 being unrated.
    * Commonly written as 123*. 123★, ☆123, etc.
    * @type {number}
    */
-  stars = -1;
+  stars = 0;
 
   /**
    * Millisecond timestamp of the song's last note, rounded up.
@@ -197,6 +217,26 @@ class SSPM {
    */
   music_length;
 
+  /**
+   * Byte offset of sspmv2 marker definitions.
+   * @type {number}
+   */
+  marker_def_offset = 0;
+
+  /**
+   * Byte length of sspmv2 marker definitions.
+   * @type {number}
+   */
+  marker_def_length = 0;
+
+  /**
+   * @type {number}
+   */
+  marker_count = 0;
+
+  /** @type {Array} */
+  marker_types = [];
+
 
 
   /**
@@ -222,7 +262,9 @@ class SSPM {
     
     this.length_ms = file.readInt32LE(o);  o += 4
     this.note_count = file.readInt32LE(o);  o += 4
+    this.marker_count = this.note_count
     this.difficulty = (file.readInt8(o) - 1);  o += 1
+    this.difficulty_name = DifficultyName[this.difficulty]
 
     // Cover
     var cover_type = file.readInt8(o);  o += 1
@@ -249,7 +291,7 @@ class SSPM {
     } else {
       // See above
       let buffer_length = Number(file.readBigInt64LE(o));  o += 8
-      var music_format = util.getAudioType(file.slice(o,o+5))
+      var music_format = util.getAudioType(file.subarray(o,o+5))
 
       if (music_format == "unknown") {
         this.broken = true
@@ -266,8 +308,94 @@ class SSPM {
     this.note_data_offset = o
     this.note_data_length = (file.byteLength - o)
     
-    var note_data = file.slice(this.note_data_offset, this.note_data_offset + this.note_data_length)
-    this.note_data_hash = crypto.createHash('sha256').update(note_data);
+    // var note_data = file.subarray(this.note_data_offset, this.note_data_offset + this.note_data_length)
+    // this.note_data_hash = crypto.createHash('sha256').update(note_data);
+  }
+
+  /**
+   * Internal function for reading v2 SSPM files
+   * @param {Buffer} file
+   * @private
+   */
+  _v2(file) {
+    var o = 6 // offset
+    if (file.readInt32LE(o) != 0) { throw "Header reserved space is not 0" }
+    o += 4
+
+    o += 20 // marker hash
+
+    this.length_ms = file.readUInt32LE(o); o += 4
+    this.note_count = file.readUInt32LE(o); o += 4
+    this.marker_count = file.readUInt32LE(o); o += 4
+    this.difficulty = (file.readUInt8(o) - 1); o += 1
+    this.stars = file.readUInt16LE(o); o += 2
+    this.broken = !Boolean(file.readUInt8(o)); o += 1
+    this.has_cover = Boolean(file.readUInt8(o)); o += 1
+    if (Boolean(file.readUInt8(o) - 1)) {
+      this.tags.push("modded")
+    }; o += 1
+
+    var cdb_offset = Number(file.readBigInt64LE(o)); o += 8
+    var cdb_length = Number(file.readBigInt64LE(o)); o += 8
+    this.music_offset = Number(file.readBigUInt64LE(o)); o += 8
+    this.music_length = Number(file.readBigUInt64LE(o)); o += 8
+    this.cover_offset = Number(file.readBigUInt64LE(o)); o += 8
+    this.cover_length = Number(file.readBigUInt64LE(o)); o += 8
+    this.marker_def_offset = Number(file.readBigUInt64LE(o)); o += 8
+    this.marker_def_length = Number(file.readBigUInt64LE(o)); o += 8
+    this.note_data_offset = Number(file.readBigUInt64LE(o)); o += 8
+    this.note_data_length = Number(file.readBigUInt64LE(o)); o += 8
+
+    // Metadata
+    var len = file.readUInt16LE(o); o += 2
+    this.id = file.subarray(o, o + len).toString("utf8"); o += len
+
+    len = file.readUInt16LE(o); o += 2
+    this.name = file.subarray(o, o + len).toString("utf8"); o += len
+    len = file.readUInt16LE(o); o += 2
+    this.song = file.subarray(o, o + len).toString("utf8"); o += len
+
+    this.author = []
+    var num = file.readUInt16LE(o); o += 2
+    for (var i = 0; i < num; i++) {
+      len = file.readUInt16LE(o); o += 2
+      this.author.push(file.subarray(o, o + len).toString("utf8")); o += len
+    }
+    
+    o = cdb_offset
+    var field_count = file.readUInt16LE(o); o += 2
+
+    this.difficulty_name = DifficultyName[this.difficulty]
+    for (var i = 0; i < field_count; i++) {
+      len = file.readUInt16LE(o); o += 2
+      var n = file.subarray(o, o + len).toString("utf8"); o += len
+      var r = util.read_data_type(file, o, false, false)
+      o = r.off
+      if (n == "difficulty_name") {
+        this.difficulty_name = r.result
+      }
+    }
+
+    o = this.marker_def_offset
+
+    this.marker_types = []
+    var marker_type_count = file.readUInt8(o); o += 1
+
+    for (var i = 0; i < marker_type_count; i++) {
+      var t = []
+      this.marker_types[i] = t
+      var len = file.readUInt16LE(o); o += 2
+      var name = file.subarray(o, o + len).toString("utf8"); o += len
+      t.push(name)
+
+      var typecount = file.readUInt8(o); o += 1
+      
+      for (var j = 1; j < typecount + 1; j++){
+        var type = file.readUInt8(o); o += 1
+        t.push(type)
+      }
+      o += 1
+    }
   }
 
   /**
@@ -280,7 +408,7 @@ class SSPM {
     /** @type {Buffer} */
     var file = fs.readFileSync(path, {encoding: null})
     
-    var sig = file.slice(0,4)
+    var sig = file.subarray(0,4)
     if (!sspmSignature.equals(sig)) { throw "Invalid file signature" }
 
     var version = file.readInt16LE(4)
@@ -289,6 +417,9 @@ class SSPM {
     switch (version) {
       case 1:
         this._v1(file)
+        break
+      case 2:
+        this._v2(file)
         break
       default:
         console.log("Unknown .sspm version")
@@ -306,9 +437,9 @@ class SSPM {
    */
    getCover() {
     if (this.path == "") { throw "No file loaded" }
-    if (this.cover_offset != undefined && this.cover_length != undefined) {
+    if (this.has_cover && this.cover_offset != undefined && this.cover_length != undefined) {
       var file = fs.readFileSync(this.path, {encoding: null})
-      return file.slice(this.cover_offset, this.cover_offset + this.cover_length)
+      return file.subarray(this.cover_offset, this.cover_offset + this.cover_length)
     } else {
       throw "File does not have a cover"
     }
@@ -320,9 +451,9 @@ class SSPM {
    */
   getAudio() {
     if (this.path == "") { throw "No file loaded" }
-    if (this.music_offset != undefined && this.music_length != undefined) {
+    if (!this.broken && this.music_offset != undefined && this.music_length != undefined) {
       var file = fs.readFileSync(this.path, {encoding: null})
-      return file.slice(this.music_offset, this.music_offset + this.music_length)
+      return file.subarray(this.music_offset, this.music_offset + this.music_length)
     } else {
       throw "File does not have audio"
     }
@@ -341,10 +472,10 @@ class SSPM {
   /**
    * @returns {Array<Array<number>>}
    */
-   _getNotes_v1() {
+  _getNotes_v1() {
     
     var file = fs.readFileSync(this.path, {encoding: null})
-    var dv = file.slice(this.note_data_offset, this.note_data_offset + this.note_data_length)
+    var dv = file.subarray(this.note_data_offset, this.note_data_offset + this.note_data_length)
 
     var off = 0
 
@@ -370,10 +501,92 @@ class SSPM {
   /**
    * @returns {Array<Array<number>>}
    */
+  _getNotes_v2() {
+    var file = fs.readFileSync(this.path, {encoding: null})
+    var o = this.note_data_offset
+    
+		var markers = {}
+
+    /** @type {Array} */
+		var mt_name = []
+
+    /** @type {Array} */
+		var mt_type = []
+
+    /** @type {Array} */
+		var mt_size = []
+		
+		for (var i = 0; i < this.marker_types.length; i++) {
+      /** @type {Array} */
+      var mt = this.marker_types[i]
+			mt_name[i] = mt[0]
+			mt_size[i] = 0
+			markers[mt[0]] = []
+			
+			var mtt = []
+			mt_type[i] = mtt
+
+			for (var j = 1; j < mt.length; j++) {
+				mtt[j-1] = mt[j]
+				
+				if (mt[j] == DT_POSITION ){
+					mt_size[i] += 2
+				} else {
+					mt_size[i] += 1
+        }
+      }
+		}
+
+    for (var i = 0; i < this.marker_count; i++) {
+      /** @type {Array} */
+      var m = []
+			var ms = file.readUInt32LE(o); o += 4
+			var type_id = file.readUInt8(o); o += 1
+
+      /** @type {string} */
+			var name = mt_name[type_id]
+
+      /** @type {Array} */
+			var data = mt_type[type_id]
+
+			var offset = 1
+			m[0] = ms
+			
+			for (var ti = 0; ti < data.length; ti++) {
+				var r = util.read_data_type(
+					file,
+          o,
+					true,
+					false,
+					data[ti]
+				)
+        o = r.off
+        var v = r.result
+				
+				if (data[ti] == DT_POSITION) {
+					m[ti + offset] = v.x
+					offset += 1
+					m[ti + offset] = v.y
+				} else {
+					m[ti + offset] = v
+        }
+			}
+			markers[name].push(m)
+		}
+
+    if (!markers.ssp_note) { throw new Error("no ssp_note?") }
+		return markers.ssp_note
+  }
+
+  /**
+   * @returns {Array<Array<number>>}
+   */
   getNotes() {
     switch (this.version) {
       case 1:
         return this._getNotes_v1()
+      case 2:
+        return this._getNotes_v2()
       default:
         throw "Unknown .sspm version"
     }
@@ -388,7 +601,6 @@ class SSPM {
     for (var n of notes) {
       str += `,${n[1]}|${n[2]}|${n[0]}`
     }
-    console.log(str)
     return str
   }
 
@@ -408,7 +620,7 @@ class SSPM {
       song: this.song,
       author: this.author,
       difficulty: this.difficulty,
-      difficulty_name: DifficultyName[this.difficulty],
+      difficulty_name: this.difficulty_name,
       stars: this.stars,
       length_ms: this.length_ms,
       note_count: this.note_count,
@@ -424,6 +636,7 @@ class SSPM {
       music_offset: this.music_offset,
       music_length: this.music_length,
     }
+    if (this.broken) { console.log("it borken") }
 
     return data
   }
